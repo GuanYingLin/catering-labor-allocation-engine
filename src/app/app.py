@@ -82,7 +82,7 @@ CSV_FILENAMES: dict[str, str] = {
 }
 
 TAX_MODE_NONE = "稅前損益模式（不計營業稅）"
-TAX_MODE_AUTO = "自動判定起徵點階梯（≤起徵點課 1%，>起徵點課 5%）"
+TAX_MODE_AUTO = "自動判定統一發票門檻（未達 20 萬課 1%，達 20 萬課 5%）"
 TAX_MODE_VAT5 = "已使用統一發票（固定 5% 營業稅）"
 
 COLOR_NAVY = "#1B365D"
@@ -470,7 +470,7 @@ def calc_r1_threshold(
     tax_mode: str,
     params: dict[str, Any],
 ) -> float:
-    """求解維持基準淨利 pi0 所需之最低含稅月營業額門檻 R1（含起徵點階梯分段解析解）"""
+    """求解維持基準淨利 pi0 所需之最低含稅月營業額門檻 R1（含 20 萬元統一發票門檻階梯分段解析解）"""
     cm_critical = float(params["cm_critical_threshold"])
     vat_threshold = float(params["vat_threshold"])
 
@@ -919,7 +919,7 @@ def main() -> None:
 
         st.markdown("---")
         tax_mode = st.selectbox(
-            f"營業稅制（含 {int(vat_threshold // 10000)} 萬元起徵點階梯斷層）",
+            f"營業稅制（含 {int(vat_threshold // 10000)} 萬元統一發票使用門檻）",
             [TAX_MODE_NONE, TAX_MODE_AUTO, TAX_MODE_VAT5],
             index=2,
         )
@@ -1093,7 +1093,7 @@ def main() -> None:
     curr_net_margin = (curr_net_profit / current_revenue * 100.0) if current_revenue > 0 else 0.0
     curr_prime_cost_pct = cogs_pct + curr_labor_pct
 
-    # 檢查邊際貢獻率狀態（考慮自動起徵點模式下 >20萬 區段之邊際貢獻率）
+    # 檢查邊際貢獻率狀態（考慮自動稅制模式下達 20 萬元門檻後 5% 稅率區段之邊際貢獻率）
     target_alpha_for_r1 = (
         float(params["alpha_exempt"])
         if tax_mode == TAX_MODE_NONE
@@ -1234,7 +1234,7 @@ def main() -> None:
         st.error(
             f"🚨 **【結構性倒掛防禦警示：邊際貢獻率 CM ≤ 0%】**\n\n"
             f"- **數學診斷**：目前邊際貢獻率 $\\text{{CM}} = \\alpha ({curr_alpha:.4f}) - [\\text{{食材成本率}} ({cogs_pct:.2f}\\%) + \\text{{變動營業費用率}} ({var_opex_pct:.2f}\\%)] = \\mathbf{{{effective_cm_rate * 100.0:.2f}\\% \\le 0\\%}}$"
-            f"{f'（跨過起徵點 5% 稅率區段 CM = {vat5_cm_rate * 100.0:.2f}%）' if tax_mode == TAX_MODE_AUTO else ''}。\n"
+            f"{f'（達 20 萬元統一發票門檻 5% 稅率區段 CM = {vat5_cm_rate * 100.0:.2f}%）' if tax_mode == TAX_MODE_AUTO else ''}。\n"
             f"- **經濟意義**：每多創造 1 元營業額，扣除營業稅、食材與變動費用後之邊際毛利為 **`{effective_cm_rate:.4f} 元`（越賣越虧）**，不論營業額放大至任何規模皆無法打平新增人事成本（$\\lim_{{\\text{{CM}} \\to 0^+}} R_1 = \\infty$）。\n"
             f"- **強制處置**：系統已鎖定 $R_1$ 為「無法收斂 (CM ≤ 0% 邊際虧損)」，請立即將「食材成本率＋變動營業費用率」合計至少下調 **`{min_cost_cut_needed:.2f}` 個百分點** 以上，使邊際貢獻率重返正值區間。"
         )

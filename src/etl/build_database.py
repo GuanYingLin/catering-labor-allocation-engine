@@ -118,7 +118,7 @@ def parse_cost_structure_pdfs() -> pd.DataFrame:
             records.append({
                 "survey_year": survey_year,
                 "roc_year": roc_year,
-                "regime_period": "Pre-2018 (調查推估期)" if survey_year < 2018 else "Post-2018 (綜所稅推估期)",
+                "regime_period": "Pre-2018 (調查推估期)" if survey_year < 2018 else "Post-2018 (營所稅推估期)",
                 "industry_code_raw": raw_code,
                 "industry_category": target_map[raw_code],
                 "revenue_mn": rev,
@@ -295,12 +295,29 @@ def main():
         DB_PATH.unlink()
 
     with sqlite3.connect(DB_PATH) as conn:
-        with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
-            conn.executescript(f.read())
+        df_cost.to_sql("fact_cost_structure", conn, if_exists="replace", index=False)
+        df_obstacles.to_sql("fact_operating_obstacles", conn, if_exists="replace", index=False)
+        df_wage.to_sql("dim_minimum_wage", conn, if_exists="replace", index=False)
 
-        df_cost.to_sql("fact_cost_structure", conn, if_exists="append", index=False)
-        df_obstacles.to_sql("fact_operating_obstacles", conn, if_exists="append", index=False)
-        df_wage.to_sql("dim_minimum_wage", conn, if_exists="append", index=False)
+        conn.executescript("""
+            DROP VIEW IF EXISTS vw_catering_benchmark_mart;
+            CREATE VIEW vw_catering_benchmark_mart AS
+            SELECT
+                industry_category,
+                COUNT(*) AS sample_years,
+                ROUND(AVG(cogs_pct), 2) AS avg_cogs_pct,
+                ROUND(AVG(labor_cost_pct), 2) AS avg_labor_cost_pct,
+                ROUND(AVG(rent_pct), 2) AS avg_rent_pct,
+                ROUND(AVG(other_opex_pct), 2) AS avg_other_opex_pct,
+                ROUND(AVG(operating_margin_pct), 2) AS avg_operating_margin_pct,
+                MAX(CASE WHEN survey_year = 2024 THEN cogs_pct END) AS latest_2024_cogs_pct,
+                MAX(CASE WHEN survey_year = 2024 THEN labor_cost_pct END) AS latest_2024_labor_pct,
+                MAX(CASE WHEN survey_year = 2024 THEN operating_margin_pct END) AS latest_2024_margin_pct
+            FROM fact_cost_structure
+            WHERE industry_category IN ('餐館業', '飲料店業')
+              AND survey_year >= 2018
+            GROUP BY industry_category;
+        """)
 
         df_mart = pd.read_sql_query("SELECT * FROM vw_catering_benchmark_mart;", conn)
 

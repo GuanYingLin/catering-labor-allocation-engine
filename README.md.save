@@ -1,0 +1,78 @@
+# 餐飲門市人事成本最適資源配置系統 (M-System)
+
+## 專案概述
+M-System 是一套針對餐飲業微觀營運開發的財務決策支援系統。透過整合經濟部歷年宏觀統計資料與門市 270 天微觀 POS 實測數據，建立邊際損益與產能評估模型，解決餐飲業在人力配置上「盲目擴張導致淨利稀釋」的核心命題。
+
+## 商業價值與核心經濟模型
+- **SPLH 產能邊界診斷**：定義每小時產值黃金區間，量化評估現有團隊承載力。
+- **R1 邊際損益兩平門檻**：導入階梯式固定成本與營業稅起徵點變數，精準推算增聘正職或兼職所需之營收成長下限。
+- **實質勞動成本校準**：還原雇主法定負擔乘數，消除名目薪資造成之財務偏誤與沉沒成本干擾。
+
+## 系統架構與資料管線
+系統採用端到端 (End-to-End) 邊緣運算設計，確保決策引擎具備容錯力與擴展性：
+1. **資料擷取 (Extract)**：多源擷取官方調查 PDF 與門市 POS Excel 原始檔。
+2. **轉換與清洗 (Transform)**：
+  - 採用像素座標群聚演算法，精準解析非結構化 PDF 跨頁表格與斷行位移。
+  - 運用非同步時序對齊技術，將離散之法定工資調漲公告轉化為連續時間網格。
+3. **資料倉儲 (Load)**：以 SQLite 建立星狀倉儲，透過分析視圖鎖定顆粒度，建立單一真實數據源 (SSOT)。
+4. **決策交付 (Serve)**：結合 Streamlit 與 Tableau，提供具備斷路防護機制之動態參數儀表板。
+
+## 雙軌交付架構：商業決策與底層工程
+本專案採商業實證與技術開發雙軌並行，完整目錄結構與資產映射如下：
+
+```text
+catering-labor-allocation-engine/
+├── data/
+│   ├── raw/
+│   │   ├── moea_catering_survey_2015_2024/            # 經濟部《餐飲業經營實況調查》歷年報告 (共 17 份 PDF)
+│   │   ├── mol_minimum_wage_2015_2026.csv             # 勞動部歷年基本工資調整公告標準 (2015–2026)
+│   │   └── 麥味登門市營運績效分析總表_2025-2026.xlsx  # 連鎖早午餐門市 270 營業日 POS 營運實測原始檔
+│   ├── db/
+│   │   └── catering_benchmark.db                      # 集中儲存事實表、維度表與跨源正規化分析視圖 (vw_catering_benchmark_mart)
+│   └── processed/
+│       ├── clean_cost_structure_2015_2024.csv
+│       ├── clean_operating_obstacles_2016_2024.csv
+│       ├── clean_minimum_wage_index_2015_2026.csv
+│       ├── clean_store_day_type_2025_2026.csv
+│       ├── clean_store_monthly_2025_2026.csv
+│       └── clean_store_timeslots_2025_2026.csv
+├── docs/
+│   └── pitch/
+│       ├── speaker_notes.md.rtf                       # 逐頁演講口語講稿
+│       ├── qa_list.md                                 # 評審問答清單 (已更新為真實程式碼防禦版本)
+│       └── assets/                                    # 決策防禦實證資產庫
+│           ├── 01_sqlite_schema_and_mart_view.jpg         # 附錄 3-1：SQLite 結構與標準化分析視圖實證
+│           ├── 02_sql_left_join_timeline_verification.jpg # 附錄 3-2：跨表 LEFT JOIN 時間軸對齊實證
+│           ├── 03_etl_assertion_check_len_24.jpg          # 附錄 3-4 (前半)：ETL 資料維度斷言檢查機制實證
+│           ├── 04_pdf_pixel_clustering_algorithm.jpg      # 附錄 3-3：PDF 像素座標群聚演算法實證
+│           ├── 05_etl_dynamic_path_search.jpg             # 附錄 3-4 (後半)：動態路徑尋找與容錯機制實證
+│           └── 06_test_pipeline_execution_result.jpg      # 附錄 3-5：自動化管線與資料庫完整性測試全綠實證
+└── src/
+    ├── etl/
+    │   ├── build_database.py                          # 執行 2018 綜所稅口徑分隔、指數化與 SQLite 建表 (含 PDF 群聚解析)
+    │   ├── etl_store_benchmark.py                     # 清洗門市 POS Excel 並同步寫入 SQLite 與標準 CSV
+    │   └── test_pipeline.py                           # [新增] 自動化 ETL 管線與資料庫完整性檢驗腳本
+    └── app/
+        └── app.py                                     # Streamlit 互動式人力配置與損益模擬系統
+
+
+
+
+# 餐飲門市人事成本最適資源配置系統 (M-System)
+
+這是一個以個體經濟推演與門市營運分析為核心的決策支援系統，旨在解決餐飲業「多請一個人到底划不划算」的核心命題。
+
+## 系統架構
+本系統採用 Python 進行全自動化 ETL 萃取與清洗，以 SQLite 建構關聯式分析資料庫，並透過 Streamlit 打造互動式決策引擎。
+
+## 目錄結構說明
+*   `data/`: 包含原始資料 (raw)、處理後資料 (processed) 以及 SQLite 資料庫 (db)。
+*   `docs/`: 存放專案交付之商業簡報、講稿與問答清單。
+*   `src/`:
+    *   `etl/`: 負責資料清洗、時序對齊與特徵工程的 Python 腳本。
+    *   `app/`: Streamlit 決策引擎主程式。
+
+## 核心技術亮點
+1.  **PDF 像素座標群聚解析**：免疫政府公開報告格式異動。
+2.  **時序特徵對齊 (merge_asof)**：將一次性工資調漲公告轉化為連續成本壓力線。
+3.  **邊際損益斷路防禦機制**：精準計算 R1 損益兩平門檻，防止盲目擴張。

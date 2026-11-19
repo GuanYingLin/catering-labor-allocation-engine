@@ -1,29 +1,42 @@
-import glob
 import os
 import shutil
 import sqlite3
+from pathlib import Path
 import pandas as pd
+
+# 自動定位專案根目錄 (/Users/linguanying/Desktop/GitHub/catering-labor-allocation-engine)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+DB_PATH = PROJECT_ROOT / "data" / "db" / "catering_benchmark.db"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 # 精準搜尋指定目錄，避免全機遞迴掃描
 search_dirs = [
-    "data/raw",
-    ".",
-    os.path.expanduser("~/Downloads"),
-    os.path.expanduser("~/Desktop"),
+    RAW_DIR,
+    PROJECT_ROOT,
+    Path.home() / "Downloads",
+    Path.home() / "Desktop",
 ]
+
 excel_path = None
 for d in search_dirs:
-    matches = glob.glob(os.path.join(d, "麥味登門市營運績效分析總表_2025-2026*.xlsx"))
+    matches = sorted(d.glob("麥味登門市營運績效分析總表_2025-2026*.xlsx"))
     if matches:
         excel_path = matches[0]
         break
 
 if not excel_path:
-    raise FileNotFoundError("在 data/raw、專案根目錄、Downloads 或 Desktop 皆找不到門市 Excel 檔案。")
+    raise FileNotFoundError(
+        f"在 {RAW_DIR}、專案根目錄、Downloads 或 Desktop 皆找不到門市 Excel 檔案。"
+    )
 
-# 若原始檔位於 Downloads 或 Desktop，自動複製一份至 data/raw 維持唯讀原始層完整
-raw_target = os.path.join("data/raw", os.path.basename(excel_path))
-if os.path.abspath(excel_path) != os.path.abspath(raw_target):
+# 若原始檔位於 Downloads 或 Desktop，自動複製一份至專案根目錄的 data/raw 維持唯讀原始層完整
+raw_target = RAW_DIR / excel_path.name
+if excel_path.resolve() != raw_target.resolve():
     shutil.copy2(excel_path, raw_target)
     excel_path = raw_target
 
@@ -87,20 +100,16 @@ timeslots["slot_type"] = timeslots["time_slot"].apply(
     else ("轉折時段" if s.startswith("09:00") else "離峰時段")
 )
 
-# 寫入 SQLite 資料庫
-db_candidates = glob.glob("data/db/*.db") + glob.glob("data/processed/*.sqlite")
-db_path = db_candidates[0] if db_candidates else "data/db/catering_benchmark.db"
+# 寫入專案根目錄之 SQLite 資料庫
+with sqlite3.connect(DB_PATH) as conn:
+    monthly.to_sql("fact_store_monthly", conn, if_exists="replace", index=False)
+    day_type.to_sql("fact_store_day_type", conn, if_exists="replace", index=False)
+    timeslots.to_sql("fact_store_timeslots", conn, if_exists="replace", index=False)
 
-conn = sqlite3.connect(db_path)
-monthly.to_sql("fact_store_monthly", conn, if_exists="replace", index=False)
-day_type.to_sql("fact_store_day_type", conn, if_exists="replace", index=False)
-timeslots.to_sql("fact_store_timeslots", conn, if_exists="replace", index=False)
-conn.close()
-print(f"[INFO] 已成功寫入 SQLite 資料表至: {db_path}")
+print(f"[INFO] 已成功寫入 SQLite 資料表至: {DB_PATH}")
 
 # 匯出供 Tableau 直連之標準化 CSV
-out_dir = "data/processed"
-monthly.to_csv(os.path.join(out_dir, "clean_store_monthly_2025_2026.csv"), index=False, encoding="utf-8-sig")
-day_type.to_csv(os.path.join(out_dir, "clean_store_day_type_2025_2026.csv"), index=False, encoding="utf-8-sig")
-timeslots.to_csv(os.path.join(out_dir, "clean_store_timeslots_2025_2026.csv"), index=False, encoding="utf-8-sig")
-print("[SUCCESS] 已匯出 3 份乾淨 CSV 至 data/processed/ 目錄。")
+monthly.to_csv(PROCESSED_DIR / "clean_store_monthly_2025_2026.csv", index=False, encoding="utf-8-sig")
+day_type.to_csv(PROCESSED_DIR / "clean_store_day_type_2025_2026.csv", index=False, encoding="utf-8-sig")
+timeslots.to_csv(PROCESSED_DIR / "clean_store_timeslots_2025_2026.csv", index=False, encoding="utf-8-sig")
+print(f"[SUCCESS] 已匯出 3 份乾淨 CSV 至 {PROCESSED_DIR} 目錄。")
