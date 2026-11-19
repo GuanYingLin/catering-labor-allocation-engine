@@ -1,5 +1,8 @@
 # 餐飲門市人事成本最適資源配置系統 (M-System)
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://catering-labor-allocation-engine.streamlit.app/)
+> **線上互動決策引擎**：https://catering-labor-allocation-engine.streamlit.app/
+
 ## 專案概述
 M-System 是一套針對餐飲業微觀營運開發的財務決策支援系統。透過整合經濟部歷年宏觀統計資料與門市 270 天微觀 POS 實測數據，建立邊際損益與產能評估模型，解決餐飲業在人力配置上「盲目擴張導致淨利稀釋」的核心命題。
 
@@ -10,6 +13,71 @@ M-System 是一套針對餐飲業微觀營運開發的財務決策支援系統�
 
 ## 系統架構與資料管線
 系統採用端到端 (End-to-End) 邊緣運算設計，確保決策引擎具備防禦力與擴展性：
+
+```mermaid
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'primaryColor': '#ffffff',
+    'primaryTextColor': '#1e293b',
+    'primaryBorderColor': '#1b5e58',
+    'lineColor': '#64748b',
+    'fontSize': '14px',
+    'fontFamily': 'Noto Sans TC, sans-serif'
+  },
+  'flowchart': {
+    'curve': 'linear',
+    'nodeSpacing': 25,
+    'rankSpacing': 50
+  }
+}}%%
+flowchart LR
+   subgraph S1["<b>1. 資料擷取 (Extract)</b>"]
+       direction TB
+       A1["<b>門市 POS 實測</b><br/>270 營業日營運明細"]
+       A2["<b>勞動部工資表 CSV</b><br/>2015–2026 歷年標準"]
+       A3["<b>經濟部調查 PDF</b><br/>2015–2024 共 17 份"]
+   end
+
+   subgraph S2["<b>2. Python 清洗轉換 (Transform)</b>"]
+       direction TB
+       B1["<b>門市營運特徵萃取</b><br/>平假日 / 5大時段 / 淡旺季"]
+       B2["<b>口徑校準與指數化</b><br/>2018 基準分隔 / 2015=100"]
+       B3["<b>pdfplumber 座標解析</b><br/>跨頁斷行與代碼映射"]
+   end
+
+   subgraph S3["<b>3. 資料倉儲 (Load - SQLite)</b>"]
+       direction TB
+       C1[("<b>門市營運事實表 (3 Facts)</b><br/>day_type / monthly / timeslots")]
+       C2[("<b>宏觀與成本表 (2 Facts + 1 Dim)</b><br/>cost_structure / obstacles / wage")]
+       V1[["<b>vw_catering_benchmark_mart</b><br/>餐飲業基準分析視圖 (Data Mart)"]]
+   end
+
+   subgraph S4["<b>4. 商業交付 (Serve)</b>"]
+       direction TB
+       D1["<b>Streamlit 決策引擎</b><br/>雙維度產能與邊際排班"]
+       D2["<b>Tableau 視覺化</b><br/>四大收支結構與波動分析"]
+   end
+
+   A1 --> B1
+   A2 --> B2
+   A3 --> B3
+   B3 --> B2
+
+   B1 --> C1
+   B2 --> C2
+   C2 --> V1
+
+   C1 & V1 --> D1
+   C2 & V1 --> D2
+
+   style S1 fill:transparent,stroke:#1b5e58,stroke-width:2px,color:#1b5e58
+   style S2 fill:transparent,stroke:#c28551,stroke-width:2px,color:#9a6234
+   style S3 fill:transparent,stroke:#1b5e58,stroke-width:2px,color:#1b5e58
+   style S4 fill:transparent,stroke:#c28551,stroke-width:2px,color:#9a6234
+
+```
+
 1. **資料擷取 (Extract)**：多源擷取官方調查 PDF、勞動部工資 CSV 與門市 POS Excel 原始檔。
 2. **轉換與清洗 (Transform)**：
    - 採用像素座標群聚演算法，精準解析非結構化 PDF 跨頁表格與斷行位移。
@@ -56,3 +124,4 @@ catering-labor-allocation-engine/
     │   └── test_pipeline.py                           # 自動化 ETL 管線與資料庫完整性檢驗腳本 (6 項測試)
     └── app/
         └── app.py                                     # Streamlit 互動式人力配置與損益模擬系統
+```
