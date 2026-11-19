@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# ==============================================================================
+# Project : M-System 餐飲門市人事成本最適資源配置系統
+# Module  : build_database.py (端到端座標級 ETL 萃取與 SQLite 星狀倉儲建置)
+# SSOT    : 2018 營所稅推估期標記 / 收支 24 筆斷言 / 困境 45 筆斷言
+# Version : v2.0 (Final Pitch Release)
+# ==============================================================================
 """
 餐飲門市人事成本最適資源配置系統 - 座標級全動態 ETL 資料萃取與 SQLite 建庫管線
 使用 pdfplumber 像素座標群聚 (Y-axis clustering + X-axis sorting) 精準解析跨年度異質 PDF 表格。
 """
+
 
 import re
 import sqlite3
