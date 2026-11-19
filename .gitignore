@@ -4,3 +4,9 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# 忽略 pitch 目錄內非 PDF 項目
+docs/pitch/assets/
+docs/pitch/gamma_outline.md
+docs/pitch/qa_list.txt
+docs/pitch/speaker_notes.txt
