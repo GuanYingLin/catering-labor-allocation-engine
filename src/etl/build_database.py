@@ -27,7 +27,6 @@ def _cluster_words_by_row(page, y_tolerance: float = 5.0) -> list[str]:
     if not words:
         return []
 
-    # 依垂直座標排序
     words_sorted = sorted(words, key=lambda w: (w["top"], w["x0"]))
     rows = []
     current_row = [words_sorted[0]]
@@ -37,7 +36,6 @@ def _cluster_words_by_row(page, y_tolerance: float = 5.0) -> list[str]:
         if abs(w["top"] - current_y) <= y_tolerance:
             current_row.append(w)
         else:
-            # 同一列依 x0 由左至右排序並串接
             current_row.sort(key=lambda item: item["x0"])
             rows.append(" ".join(item["text"] for item in current_row))
             current_row = [w]
@@ -98,14 +96,9 @@ def parse_cost_structure_pdfs() -> pd.DataFrame:
             rest = row_str.strip()[len(raw_code):]
             nums = _extract_numbers(rest)
 
-            # 若該列數字不足 9 個（極端情況下跨行），向下一列補抓
             if len(nums) < 9 and idx + 1 < len(rows):
                 nums.extend(_extract_numbers(rows[idx + 1]))
 
-            # 根據欄位數精確解包：
-            # 11 欄 (2017年): rev, total_exp, cogs, labor, rent, tax, depr, bad_debt, freight, other_opex, op_profit
-            # 10 欄 (2015年, 運費留白): rev, total_exp, cogs, labor, rent, tax, depr, bad_debt, other_opex, op_profit
-            # 10 欄 (2018-2024年, 無運費): rev, total_exp, cogs, labor, rent, tax, depr, bad_debt, other_opex, op_profit
             if len(nums) == 11:
                 rev, total_exp, cogs, labor, rent, tax, depr, bad_debt, freight, other_opex, op_profit = nums
                 other_exp = bad_debt + freight + other_opex
@@ -180,10 +173,9 @@ def parse_operating_obstacles_pdfs() -> pd.DataFrame:
                     continue
                 for pat, _, std_name in row_specs:
                     if re.search(pat, r_str) and std_name not in found:
-                        cleaned = re.sub(r"\b(5611|5631|561|562|56)\b", "", r_str)
+                        cleaned = re.sub(r"^\s*(5611|5631|561|562|56)\s+", "", r_str)
                         cleaned = re.sub(r"未\s*滿\s*5\s*人|5\s*人\s*~\s*49\s*人", "", cleaned)
                         nums = _extract_numbers(cleaned)
-                        # 若該列因垂直偏移導致數字少於 5 個，向前後各 1 列檢索補齊
                         if len(nums) < 5 and idx + 1 < len(rows):
                             nums.extend(_extract_numbers(rows[idx + 1]))
                         if len(nums) >= 5:
@@ -234,7 +226,10 @@ def parse_operating_obstacles_pdfs() -> pd.DataFrame:
                 "fierce_competition_pct": fierce_comp,
             })
 
-    return pd.DataFrame(all_records)
+    df = pd.DataFrame(all_records)
+    if len(df) != 45:
+        raise RuntimeError(f"預期萃取 45 筆 (9年 x 5維度)，實際取得 {len(df)} 筆。")
+    return df
 
 
 def parse_minimum_wage_csv() -> pd.DataFrame:

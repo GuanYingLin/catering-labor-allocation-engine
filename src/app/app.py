@@ -64,10 +64,10 @@ FALLBACK_CONFIG: dict[str, Any] = {
     "weekend_weekday_ratio": 1.52,
     "weekday_ticket": 146,
     "weekend_ticket": 190,
-    "latest_obstacle_year": 2024,
-    "obs_labor_shortage_pct": 61.5,
-    "obs_high_turnover_pct": 55.6,
-    "obs_high_labor_cost_pct": 51.1,
+    "latest_obstacle_year": "2016–2024 (多年平均)",
+    "obs_labor_shortage_pct": 42.1,
+    "obs_high_turnover_pct": 51.4,
+    "obs_high_labor_cost_pct": 50.3,
     "obs_ingredient_volatility_pct": 65.6,
     "obs_high_rent_pct": 30.2,
 }
@@ -302,20 +302,17 @@ def load_empirical_parameters() -> dict[str, Any]:
     # 6. 餐飲業經營困境調查表 (clean_operating_obstacles_2016_2024.csv)
     df_o, path_o = read_csv_safely(CSV_FILENAMES["obstacles"])
     if df_o is not None and {"survey_year", "segment_name", "labor_shortage_pct", "high_turnover_pct", "high_labor_cost_pct"}.issubset(df_o.columns):
-        latest_o_year = int(df_o["survey_year"].max())
-        df_o_latest = df_o[(df_o["survey_year"] == latest_o_year) & (df_o["segment_name"] == "餐飲業總計")]
-        if df_o_latest.empty:
-            df_o_latest = df_o[df_o["survey_year"] == latest_o_year]
-        if not df_o_latest.empty:
-            r_o = df_o_latest.iloc[0]
-            params["latest_obstacle_year"] = latest_o_year
-            params["obs_labor_shortage_pct"] = float(r_o["labor_shortage_pct"])
-            params["obs_high_turnover_pct"] = float(r_o["high_turnover_pct"])
-            params["obs_high_labor_cost_pct"] = float(r_o["high_labor_cost_pct"])
-            if "ingredient_volatility_pct" in r_o:
-                params["obs_ingredient_volatility_pct"] = float(r_o["ingredient_volatility_pct"])
-            if "high_rent_pct" in r_o:
-                params["obs_high_rent_pct"] = float(r_o["high_rent_pct"])
+        df_o_total = df_o[df_o["segment_name"] == "餐飲業總計"]
+        if df_o_total.empty:
+            df_o_total = df_o
+        params["latest_obstacle_year"] = "2016–2024 (多年平均)"
+        params["obs_high_turnover_pct"] = round(float(df_o_total["high_turnover_pct"].mean()), 1)
+        params["obs_high_labor_cost_pct"] = round(float(df_o_total["high_labor_cost_pct"].mean()), 1)
+        params["obs_labor_shortage_pct"] = round(float(df_o_total["labor_shortage_pct"].dropna().mean()), 1)
+        if "ingredient_volatility_pct" in df_o_total.columns:
+            params["obs_ingredient_volatility_pct"] = round(float(df_o_total["ingredient_volatility_pct"].mean()), 1)
+        if "high_rent_pct" in df_o_total.columns:
+            params["obs_high_rent_pct"] = round(float(df_o_total["high_rent_pct"].mean()), 1)
         csv_status["obstacles"] = {"loaded": True, "rows": len(df_o), "path": str(path_o.name)}
     else:
         csv_status["obstacles"] = {"loaded": False, "rows": 0, "path": "Fallback"}
@@ -1397,7 +1394,7 @@ def main() -> None:
                為國際餐飲與零售營運管理標準人效指標（美國全國餐飲協會 NRA 營運基準），計算公式為 $\\text{{SPLH}} = \\text{{含稅營業額}} \\div \\text{{總投入工時}}$，用於衡量每一小時勞動投入所創造之營收產值。
             2. **台灣餐飲業 {int(idle_th)}–{int(opt_up)} 元/hr 區間動態財務反推依據**：
                - **單位工時實質成本**：依 `clean_minimum_wage_index_2015_2026.csv` 最新 {wage_year} 年法定基準（時薪 {min_hourly_wage} 元、月薪 {min_monthly_wage:,} 元；指數分別達 {params['hourly_wage_index']:.2f} 與 {params['monthly_wage_index']:.2f}），計入雇主法定勞健保與 6% 勞退提撥後（兼職 ×{pt_mult:.2f}、正職 ×{ft_mult:.2f}），餐飲門市平均每工時實質人力成本約落於 **`225–260 元/hr`**。
-               - **目標成本結構與經營困境對照**：依 `clean_cost_structure_2015_2024.csv`（{cost_year} 年平均食材成本率 `{params['macro_cogs_pct']:.2f}%`、名目人事費用率 `{params['macro_labor_pct']:.2f}%`、租金率 `{params['macro_rent_pct']:.2f}%`、折舊率 `{params['macro_dep_pct']:.2f}%`）及 `clean_operating_obstacles_2016_2024.csv`（{params['latest_obstacle_year']} 年高達 `{params['obs_labor_shortage_pct']:.1f}%` 業者面臨缺工、`{params['obs_high_turnover_pct']:.1f}%` 人員流動率高、`{params['obs_high_labor_cost_pct']:.1f}%` 人事成本過高），中小型餐飲門市健康之實質人事成本率上限約為 **`28%–35%`**（對應主要成本率 Prime Cost $\\le {prime_warn_th:.0f}\\%$）。
+               - **目標成本結構與經營困境對照**：依 `clean_cost_structure_2015_2024.csv`（{cost_year} 年平均食材成本率 `{params['macro_cogs_pct']:.2f}%`、名目人事費用率 `{params['macro_labor_pct']:.2f}%`、租金率 `{params['macro_rent_pct']:.2f}%`、折舊率 `{params['macro_dep_pct']:.2f}%`）及 `clean_operating_obstacles_2016_2024.csv`（{params['latest_obstacle_year']} 調查平均高達 `{params['obs_high_turnover_pct']:.1f}%` 人員流動率高、`{params['obs_high_labor_cost_pct']:.1f}%` 人事成本過高、`{params['obs_labor_shortage_pct']:.1f}%` 人力短缺），中小型餐飲門市健康之實質人事成本率上限約為 **`28%–35%`**（對應主要成本率 Prime Cost $\\le {prime_warn_th:.0f}\\%$）。
                - **門市 POS 實測校準**：依 `clean_store_timeslots_2025_2026.csv` 與 `clean_store_day_type_2025_2026.csv`，門市加權平均客單價為 **`{params['weighted_avg_ticket']:.1f} 元`**（平日 `{params['weekday_ticket']} 元`、假日 `{params['weekend_ticket']} 元`），雙尖峰時段（07:00–09:00、11:00–13:00）集中了 **`{params['peak_slot_rev_share_pct']:.1f}%`** 營收與 **`{params['peak_slot_traffic_share_pct']:.1f}%`** 客流，收斂設定黃金產能帶為 **`{int(idle_th)}–{int(opt_up)} 元/hr`**。
             3. **固定營業費用分離模型與邊際貢獻率防禦機制**：
                - **固定費用分離公式**：$\\Pi(R) = R \\cdot [\\alpha(R) - (c + v_{{\\text{{var}}}})] - (F_{{\\text{{rent}}}} + F_{{\\text{{dep}}}}) - L$，求解損益兩平門檻 $R_1 = \\frac{{\\Pi_0 + F_{{\\text{{rent}}}} + F_{{\\text{{dep}}}} + L_1}}{{\\alpha(R_1) - (c + v_{{\\text{{var}}}})}}$，消除傳統將店租與折舊視為變動費率所導致之 $R_1$ 虛胖偏誤。
